@@ -3,12 +3,14 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log"
 	"math/rand"
 	"net/http"
+	"os"
 	"time"
 
-	_ "github.com/go-gorm/h2"
+	_ "github.com/lib/pq"
 )
 
 type Game struct {
@@ -26,16 +28,49 @@ type Stats struct {
 var db *sql.DB
 var choices = []string{"rock", "paper", "scissors"}
 
+func getEnv(key, defaultValue string) string {
+	value := os.Getenv(key)
+	if value == "" {
+		return defaultValue
+	}
+	return value
+}
+
 func initDB() {
+	// Get database connection details from environment variables
+	host := getEnv("DB_HOST", "localhost")
+	user := getEnv("DB_USER", "postgres")
+	password := getEnv("DB_PASSWORD", "postgres")
+	dbname := getEnv("DB_NAME", "rps_game")
+	port := getEnv("DB_PORT", "5432")
+
+	// Create connection string
+	connStr := fmt.Sprintf(
+		"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		host, port, user, password, dbname,
+	)
+
 	var err error
-	db, err = sql.Open("h2", "file:./gamedb;mode=rwc;")
+	// Try to connect to the database with retries
+	for i := 0; i < 5; i++ {
+		db, err = sql.Open("postgres", connStr)
+		if err == nil {
+			err = db.Ping()
+			if err == nil {
+				break
+			}
+		}
+		log.Printf("Failed to connect to database, attempt %d/5. Retrying in 5 seconds...", i+1)
+		time.Sleep(5 * time.Second)
+	}
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Failed to connect to database after 5 attempts:", err)
 	}
 
+	// Create the table
 	_, err = db.Exec(`
         CREATE TABLE IF NOT EXISTS game_stats (
-            id INT PRIMARY KEY AUTO_INCREMENT,
+            id SERIAL PRIMARY KEY,
             result VARCHAR(10),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -43,6 +78,8 @@ func initDB() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	log.Println("Successfully connected to database")
 }
 
 func determineWinner(player, computer string) string {
@@ -60,7 +97,7 @@ func determineWinner(player, computer string) string {
 }
 
 func playGame(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
+	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
@@ -86,14 +123,13 @@ func playGame(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Generate computer choice
-	rand.Seed(time.Now().UnixNano())
 	game.ComputerChoice = choices[rand.Intn(len(choices))]
 
 	// Determine winner
 	game.Result = determineWinner(game.PlayerChoice, game.ComputerChoice)
 
 	// Save result to database
-	_, err = db.Exec("INSERT INTO game_stats (result) VALUES (?)", game.Result)
+	_, err = db.Exec("INSERT INTO game_stats (result) VALUES ($1)", game.Result)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -104,7 +140,7 @@ func playGame(w http.ResponseWriter, r *http.Request) {
 }
 
 func getStats(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "GET" {
+	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
@@ -145,12 +181,19 @@ func getStats(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	// Initialize random seed
+	rand.Seed(time.Now().UnixNano())
+
+	// Initialize database connection
 	initDB()
 	defer db.Close()
 
+	// Set up HTTP routes
 	http.HandleFunc("/play", playGame)
 	http.HandleFunc("/stats", getStats)
 
-	log.Println("Server starting on port 8080...")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	// Start the server
+	port := getEnv("PORT", "8080")
+	log.Printf("Server starting on port %s...", port)
+	log.Fatal(http.ListenAndServe(":"+port, nil))
 }

@@ -1,27 +1,29 @@
+version: '3.8'
+
 services:
   app:
-    image: your-application-image
+    build: .
     ports:
       - "8080:8080"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:h2:file:/data/demo
-      SPRING_DATASOURCE_DRIVERCLASSNAME: org.h2.Driver
-      SPRING_DATASOURCE_USERNAME: admin
-      SPRING_DATASOURCE_PASSWORD: admin
-      SPRING_JPA_DATABASE_PLATFORM: org.hibernate.dialect.H2Dialect
-      SPRING_H2_CONSOLE_ENABLED: 'true'
-    volumes:
-      - h2-data:/data
+      - DB_HOST=db
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_NAME=rps_game
+      - DB_PORT=5432
+    depends_on:
+      - db
 
-  h2:
-    image: oscarfonts/h2:latest
-    ports:
-      - "1521:1521"  # H2 TCP port
-      - "8181:81"    # H2 Web Console
-    volumes:
-      - h2-data:/h2-data
+  db:
+    image: postgres:16-alpine
     environment:
-      H2_OPTIONS: -ifNotExists
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=rps_game
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
 
 volumes:
-  h2-data:
+  postgres_data:

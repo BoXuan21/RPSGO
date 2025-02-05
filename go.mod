@@ -2,4 +2,4 @@ module rps-game
 
 go 1.21
 
-require github.com/go-gorm/h2 v1.2.2
+require github.com/lib/pq v1.10.9
