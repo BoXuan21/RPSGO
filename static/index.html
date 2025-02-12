@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rock Paper Scissors</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+        }
+        .button {
+            border: none;
+            color: white;
+            padding: 15px 32px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+        .button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        .rock {
+            background-color: #e74c3c;  /* Red */
+        }
+        .paper {
+            background-color: #3498db;  /* Blue */
+        }
+        .scissors {
+            background-color: #2ecc71;  /* Green */
+        }
+        .result {
+            margin: 20px;
+            padding: 20px;
+            border-radius: 4px;
+            background-color: #f0f0f0;
+        }
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin: 20px 0;
+            padding: 20px;
+            background-color: #f8f8f8;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+<h1>Rock Paper Scissors</h1>
+
+<div>
+    <button class="button rock" onclick="playGame('rock')">Rock</button>
+    <button class="button paper" onclick="playGame('paper')">Paper</button>
+    <button class="button scissors" onclick="playGame('scissors')">Scissors</button>
+</div>
+
+<div id="result" class="result">
+    Make your choice!
+</div>
+
+<div class="stats">
+    <div>
+        <h3>Wins</h3>
+        <span id="wins">0</span>
+    </div>
+    <div>
+        <h3>Losses</h3>
+        <span id="losses">0</span>
+    </div>
+    <div>
+        <h3>Draws</h3>
+        <span id="draws">0</span>
+    </div>
+</div>
+
+<script>
+    async function playGame(choice) {
+        try {
+            const response = await fetch('/play', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ player_choice: choice })
+            });
+            const result = await response.json();
+
+            document.getElementById('result').innerHTML = `
+                    You chose: ${result.player_choice}<br>
+                    Computer chose: ${result.computer_choice}<br>
+                    Result: You ${result.result}!
+                `;
+
+            // Update stats
+            getStats();
+        } catch (error) {
+            console.error('Error:', error);
+        }
+    }
+
+    async function getStats() {
+        try {
+            const response = await fetch('/stats');
+            const stats = await response.json();
+            document.getElementById('wins').textContent = stats.wins;
+            document.getElementById('losses').textContent = stats.losses;
+            document.getElementById('draws').textContent = stats.draws;
+        } catch (error) {
+            console.error('Error:', error);
+        }
+    }
+
+    // Load initial stats
+    getStats();
+</script>
+</body>
+</html>

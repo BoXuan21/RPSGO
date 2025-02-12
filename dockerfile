@@ -2,20 +2,20 @@ FROM golang:1.21-alpine
 
 WORKDIR /app
 
-# Install necessary build tools
-RUN apk add --no-cache gcc musl-dev
+# Install build dependencies
+RUN apk add --no-cache gcc musl-dev postgresql-client
 
-# Copy go mod files
-COPY go.mod ./
+# Copy go mod files first
+COPY go.mod go.sum ./
 
 # Download dependencies
 RUN go mod download
 
-# Copy source code
+# Copy the source code
 COPY . .
 
 # Build the application
-RUN go build -o main .
+RUN CGO_ENABLED=0 GOOS=linux go build -o main ./cmd/server
 
-# Run the application
+# Command to run the executable
 CMD ["./main"]
